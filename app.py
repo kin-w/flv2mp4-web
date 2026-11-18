@@ -255,9 +255,27 @@ def list_videos(path, recursive, exts):
 
 
 def resolve_output(src, settings):
-    """返回 (输出目录, 最终 mp4 完整路径)。"""
+    """返回 (输出目录, 最终 mp4 完整路径)。
+
+    指定输出目录时保留输入目录的结构：
+    输入 /home/bililive-go/兔娘、输出 /home/录播归档
+    -> /home/录播归档/兔娘/xxx.mp4（含子目录）。
+    """
     base_dir = os.path.dirname(src)
-    out_dir = settings["output_path"] or base_dir
+    root = settings["output_path"]
+    if not root:
+        out_dir = base_dir
+    else:
+        inp = settings["input_path"]
+        out_dir = root
+        if os.path.isdir(inp) and os.path.realpath(inp) != os.path.realpath(root):
+            rel = os.path.relpath(src, inp)
+            if rel.startswith(".."):
+                out_dir = os.path.join(root, os.path.basename(base_dir))
+            else:
+                sub = os.path.dirname(rel)
+                name = os.path.basename(os.path.normpath(inp)) or "root"
+                out_dir = os.path.join(root, name, sub) if sub else os.path.join(root, name)
     stem = os.path.splitext(os.path.basename(src))[0]
     return out_dir, os.path.join(out_dir, stem + OUTPUT_EXT)
 
