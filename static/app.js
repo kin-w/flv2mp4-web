@@ -547,8 +547,13 @@ function bind() {
   });
 
   $("outputPath").addEventListener("input", updateRisk);
-  $("moveToOutput").addEventListener("change", updateRisk);
-  $("inputPath").addEventListener("change", () => scan(true));
+  $("inputPath").addEventListener("change", () => saveSettings(true));
+  $("outputPath").addEventListener("change", () => saveSettings(true));
+  $("deleteSource").addEventListener("change", () => saveSettings(true));
+  $("moveToOutput").addEventListener("change", () => {
+    updateRisk();
+    saveSettings(false);
+  });
   $("recursive").addEventListener("change", () => saveSettings(true));
 
   $("checkAll").addEventListener("change", (e) => {
