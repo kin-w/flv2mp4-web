@@ -1,0 +1,20 @@
+services:
+  flv2mp4:
+    build: .
+    image: flv2mp4-web:latest
+    container_name: flv2mp4-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      # 容器内允许浏览/操作的根目录，多个用 : 分隔
+      V2M_ROOTS: /data
+      # 默认输入目录（“恢复默认”时使用）
+      V2M_DEFAULT_INPUT: /data
+    volumes:
+      # 宿主机录像目录 -> 容器内 /data
+      # 界面里看到的路径都是容器内路径，例如 /data/格格℘
+      - /home/bililive-go:/data
+      # 界面设置持久化（输入/输出目录、开关状态）
+      - ./config:/config

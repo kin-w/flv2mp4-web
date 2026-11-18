@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="视频转 MP4">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C94FF"/>
+      <stop offset="1" stop-color="#9A6BFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="16" fill="url(#bg)"/>
+  <rect x="1.75" y="1.75" width="60.5" height="60.5" rx="15.25" fill="none" stroke="#ffffff" stroke-opacity=".22" stroke-width="1.5"/>
+  <path d="M18 22 L35 32 L18 42 Z" fill="#ffffff" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M42 26.5 L47 32 L42 37.5" fill="none" stroke="#ffffff" stroke-opacity=".78" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

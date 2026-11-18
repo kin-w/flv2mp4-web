@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+config/
+config/settings.json
+*.exe
+*.flv
+*.mp4
+*.mkv
+*.ts
+.screenshots/
