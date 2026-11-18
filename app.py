@@ -31,9 +31,13 @@ FFMPEG = os.environ.get("V2M_FFMPEG") or shutil.which("ffmpeg") or "/usr/bin/ffm
 FFPROBE = os.environ.get("V2M_FFPROBE") or shutil.which("ffprobe") or "/usr/bin/ffprobe"
 
 # 允许访问的根目录（容器内路径），多个用系统分隔符分隔
+# 未显式设置时：宿主机根目录已挂到 /host 就用 /host，否则退回 /data
+_ROOTS_ENV = os.environ.get("V2M_ROOTS", "").strip()
+if not _ROOTS_ENV:
+    _ROOTS_ENV = "/host" if os.path.isdir("/host") else "/data"
 ROOTS = [
     os.path.realpath(p.strip())
-    for p in os.environ.get("V2M_ROOTS", "/data").split(os.pathsep)
+    for p in _ROOTS_ENV.split(os.pathsep)
     if p.strip()
 ]
 DEFAULT_INPUT = os.path.realpath(
@@ -147,6 +151,19 @@ def build_command(template, src, dst):
     return tokens
 
 
+def within_roots(path):
+    if not path:
+        return False
+    try:
+        real = os.path.realpath(path)
+    except (OSError, ValueError):
+        return False
+    for root in ROOTS:
+        if real == root or real.startswith(root.rstrip(os.sep) + os.sep):
+            return True
+    return False
+
+
 def load_settings():
     with _settings_lock:
         data = default_settings()
@@ -159,6 +176,11 @@ def load_settings():
                         data[k] = saved[k]
         except (OSError, ValueError):
             pass
+        # 挂载变化后，旧配置里的路径可能已不在允许范围内，自动回到默认目录
+        if not within_roots(data["input_path"]):
+            data["input_path"] = DEFAULT_INPUT
+        if data["output_path"] and not within_roots(data["output_path"]):
+            data["output_path"] = ""
         return data
 
 
