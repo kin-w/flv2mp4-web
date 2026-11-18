@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/logo.svg" width="96" height="96" alt="logo">
+  <img src="https://raw.githubusercontent.com/kin-w/flv2mp4-web/main/static/logo.svg" width="96" height="96" alt="logo">
 </p>
 
 <h1 align="center">视频转 MP4</h1>
