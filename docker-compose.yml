@@ -8,15 +8,16 @@ services:
       - "8080:8080"
     environment:
       TZ: Asia/Shanghai
-      # 访问密码，留空则无需登录（公网部署务必设置）
-      # V2M_PASSWORD: 你的访问密码
-      # 不设置 V2M_ROOTS 时自动探测：/host -> /data -> 容器根目录
-      # V2M_ROOTS: /host
-      # V2M_DEFAULT_INPUT: /host/home
+      # 访问密码，留空则不启用登录
+      V2M_PASSWORD: 改成你的密码
+      # 宿主机根目录已挂载到 /host，允许整个 /host 即可访问全盘
+      V2M_ROOTS: /host
+      # 默认输入目录（“恢复默认”时使用）
+      V2M_DEFAULT_INPUT: /host
     volumes:
-      # 整机挂载：界面里的路径 = /host + 宿主机路径，例如 /host/home/录播归档
+      # 宿主机根目录 -> 容器内 /host
+      # 界面里填写容器路径，例如宿主机 /home/录播归档 对应 /host/home/录播归档
+      # 注意：这等于把整台机器交给 Web 界面（可读取、可删除），请务必设置密码并限制来源 IP
       - /:/host
-      # 只挂载指定目录时改用下面这行，并设置 V2M_ROOTS: /home
-      # - /home:/home
-      # 设置与会话持久化
+      # 界面设置持久化（输入/输出目录、开关状态、登录会话）
       - ./config:/config

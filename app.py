@@ -31,21 +31,11 @@ FFMPEG = os.environ.get("V2M_FFMPEG") or shutil.which("ffmpeg") or "/usr/bin/ffm
 FFPROBE = os.environ.get("V2M_FFPROBE") or shutil.which("ffprobe") or "/usr/bin/ffprobe"
 
 # 允许访问的根目录（容器内路径），多个用系统分隔符分隔
-# 未显式配置时自动探测：优先整机挂载 /host，其次 /data，最后容器根目录
-def _detect_roots():
-    raw = os.environ.get("V2M_ROOTS", "").strip()
-    if raw:
-        paths = raw.split(os.pathsep)
-    elif os.path.isdir("/host"):
-        paths = ["/host"]
-    elif os.path.isdir("/data"):
-        paths = ["/data"]
-    else:
-        paths = ["/"]
-    return [os.path.realpath(p.strip()) for p in paths if p.strip()]
-
-
-ROOTS = _detect_roots()
+ROOTS = [
+    os.path.realpath(p.strip())
+    for p in os.environ.get("V2M_ROOTS", "/data").split(os.pathsep)
+    if p.strip()
+]
 DEFAULT_INPUT = os.path.realpath(
     os.environ.get("V2M_DEFAULT_INPUT", ROOTS[0] if ROOTS else "/data")
 )
