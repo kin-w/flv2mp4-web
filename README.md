@@ -42,16 +42,18 @@
 
 ## 快速开始
 
-### docker run
+### docker run（默认全盘模式）
+
+把宿主机根目录挂进容器，界面里可以访问任意目录：
 
 ```bash
 docker run -d --name flv2mp4-web --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
   -e V2M_PASSWORD=你的访问密码 \
-  -e V2M_ROOTS=/data \
-  -e V2M_DEFAULT_INPUT=/data \
-  -v /home/bililive-go:/data \
+  -e V2M_ROOTS=/host \
+  -e V2M_DEFAULT_INPUT=/host \
+  -v /:/host \
   -v ./config:/config \
   ikimi/flv2mp4-web:latest
 ```
@@ -59,6 +61,8 @@ docker run -d --name flv2mp4-web --restart unless-stopped \
 启动后访问 `http://服务器IP:8080`。
 
 ### docker compose
+
+仓库根目录的 [docker-compose.yml](docker-compose.yml) 就是这份配置：
 
 ```yaml
 services:
@@ -71,37 +75,40 @@ services:
     environment:
       TZ: Asia/Shanghai
       V2M_PASSWORD: 你的访问密码
-      V2M_ROOTS: /data
-      V2M_DEFAULT_INPUT: /data
+      V2M_ROOTS: /host
+      V2M_DEFAULT_INPUT: /host
     volumes:
-      - /home/bililive-go:/data      # 视频所在目录
-      - ./config:/config             # 设置与界面配置持久化
+      - /:/host                  # 宿主机根目录
+      - ./config:/config         # 设置与会话持久化
 ```
 
 ```bash
 docker compose up -d
 ```
 
-### 全盘模式（整个根目录）
+### 路径对应
 
-想把宿主机任意目录都纳入管理，把宿主机根目录挂进来即可，仓库里的 `docker-compose.yml` 默认就是这种配置：
-
-```yaml
-volumes:
-  - /:/host
-environment:
-  V2M_ROOTS: /host
-  V2M_DEFAULT_INPUT: /host
-```
-
-界面里看到的是 `/host` 开头，宿主机路径直接加前缀即可：
+容器里的 `/` 是镜像自己的文件系统，不能被宿主机覆盖，所以宿主机根目录挂在 `/host`：
 
 | 宿主机 | 界面里填 |
 |---|---|
+| `/` | `/host` |
 | `/home/录播归档` | `/host/home/录播归档` |
 | `/mnt/disk2/videos` | `/host/mnt/disk2/videos` |
 
-> 这种模式下 Web 界面可以读取、删除整台机器的文件，请务必设置 `V2M_PASSWORD`，并用防火墙限制来源 IP，或只在内网使用。
+> 全盘模式下 Web 界面可以读取、删除整台机器的文件，请务必设置 `V2M_PASSWORD`，并用防火墙限制来源 IP，或只在内网使用。
+
+### 只开放部分目录（可选）
+
+不想暴露整台机器时，改成按目录挂载，界面里填容器路径：
+
+```yaml
+volumes:
+  - /home/bililive-go:/data
+environment:
+  V2M_ROOTS: /data
+  V2M_DEFAULT_INPUT: /data
+```
 
 ### 多个磁盘 / 多个根目录
 
