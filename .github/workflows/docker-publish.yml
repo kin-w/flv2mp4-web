@@ -19,9 +19,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ARM 设备（群晖/树莓派）也要用的话保留；只发 amd64 可删掉这步和下面的 platforms 里的 arm64
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # ARM 设备也要用：恢复下面这步，并把 platforms 改成 linux/amd64,linux/arm64
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,7 +47,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
