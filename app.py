@@ -642,6 +642,9 @@ class Handler(BaseHTTPRequestHandler):
                 out[k.strip()] = v.strip()
         return out
 
+    def _session_sig(self, token):
+        return hmac.new(PASSWORD.encode("utf-8"), token.encode("utf-8"), "sha256").hexdigest()
+
     def _authed(self):
         if not PASSWORD:
             return True
@@ -651,6 +654,10 @@ class Handler(BaseHTTPRequestHandler):
         with _sessions_lock:
             sess = _sessions.get(token)
             if not sess:
+                return False
+            if not hmac.compare_digest(sess.get("sig", ""), self._session_sig(token)):
+                _sessions.pop(token, None)
+                save_sessions()
                 return False
             if sess.get("exp", 0) <= time.time():
                 _sessions.pop(token, None)
@@ -694,7 +701,7 @@ class Handler(BaseHTTPRequestHandler):
         ttl = REMEMBER_SECONDS if remember else SESSION_SECONDS
         token = secrets.token_urlsafe(32)
         with _sessions_lock:
-            _sessions[token] = {"exp": time.time() + ttl}
+            _sessions[token] = {"exp": time.time() + ttl, "sig": self._session_sig(token)}
         save_sessions()
         with _login_lock:
             _login_state.pop(ip, None)
