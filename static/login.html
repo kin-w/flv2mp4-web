@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08090b">
+<title>登录 · 视频转 MP4</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    background: radial-gradient(1200px 600px at 50% -10%, #161b2b 0%, #08090b 60%);
+    color: #e9edf5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .card {
+    width: 100%; max-width: 360px;
+    background: rgba(20, 23, 31, .82);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 18px;
+    padding: 30px 26px 26px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    backdrop-filter: blur(10px);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .brand img { width: 38px; height: 38px; border-radius: 10px; }
+  .brand b { font-size: 17px; font-weight: 600; letter-spacing: .02em; }
+  .brand span { display: block; font-size: 12px; color: #8b94a3; margin-top: 2px; }
+  label { display: block; font-size: 12px; color: #8b94a3; margin-bottom: 8px; }
+  input[type=password] {
+    width: 100%; padding: 11px 13px; font-size: 16px;
+    color: #e9edf5; background: #0d0f14;
+    border: 1px solid #262c38; border-radius: 10px;
+    outline: none; transition: border-color .15s;
+  }
+  input[type=password]:focus { border-color: #6d8cff; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 14px 0 18px; font-size: 13px; color: #b6bdca; }
+  .row input { width: 16px; height: 16px; accent-color: #6d8cff; }
+  button {
+    width: 100%; padding: 11px 14px; font-size: 14px; font-weight: 500;
+    color: #fff; background: linear-gradient(135deg, #6d8cff, #9b7bff);
+    border: 0; border-radius: 10px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: default; }
+  .err { min-height: 18px; font-size: 12.5px; color: #ff8f8f; margin-top: 12px; }
+  .tips { margin-top: 18px; font-size: 11.5px; line-height: 1.7; color: #6f7a8b; }
+</style>
+</head>
+<body>
+<form class="card" id="loginForm" autocomplete="on">
+  <div class="brand">
+    <img src="/static/logo.svg" alt="">
+    <div>
+      <b>视频转 MP4</b>
+      <span>批量无损转封装</span>
+    </div>
+  </div>
+  <label for="pwd">访问密码</label>
+  <input id="pwd" type="password" name="password" autocomplete="current-password" autofocus required>
+  <div class="row">
+    <input id="remember" type="checkbox" checked>
+    <label for="remember" style="margin:0;color:#b6bdca;">记住登录状态（30 天）</label>
+  </div>
+  <button id="submitBtn" type="submit">登录</button>
+  <div class="err" id="err"></div>
+  <div class="tips">密码由部署时设置的环境变量 V2M_PASSWORD 决定，无法在界面中修改。</div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById("loginForm");
+  var pwd = document.getElementById("pwd");
+  var remember = document.getElementById("remember");
+  var err = document.getElementById("err");
+  var btn = document.getElementById("submitBtn");
+
+  fetch("/api/auth").then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.required) location.replace("/");
+  }).catch(function () {});
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    err.textContent = "";
+    btn.disabled = true;
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ password: pwd.value, remember: remember.checked })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      if (res.ok) {
+        location.replace("/");
+      } else {
+        err.textContent = res.d.error || "登录失败";
+        btn.disabled = false;
+        pwd.select();
+      }
+    }).catch(function () {
+      err.textContent = "网络错误，请重试";
+      btn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -15,6 +15,10 @@ async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   let data = {};
   try { data = await res.json(); } catch (_) {}
+  if (res.status === 401 && data.auth_required) {
+    location.replace("/login");
+    throw new Error("未登录");
+  }
   if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
   return data;
 }
@@ -592,11 +596,19 @@ function bind() {
 (async function init() {
   bind();
   try {
+    const auth = await api("/api/auth");
+    if (auth.required) $("logoutBtn").hidden = false;
+  } catch (_) {}
+  try {
     await loadSettings();
     await loadJobs();
     await scan(true);
   } catch (e) {
     toast(e.message, true);
   }
+  $("logoutBtn").addEventListener("click", async () => {
+    try { await post("/api/logout", {}); } catch (_) {}
+    location.replace("/login");
+  });
   setInterval(loadJobs, 1500);
 })();

@@ -78,6 +78,12 @@ button, input { font-family: inherit; font-size: inherit; color: inherit; }
   letter-spacing: .02em;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .status {
   display: flex;
   align-items: center;

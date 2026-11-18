@@ -4,10 +4,12 @@
 纯标准库实现（无第三方依赖），调用系统 ffmpeg。
 """
 
+import hmac
 import json
 import os
 import queue
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -40,6 +42,41 @@ DEFAULT_INPUT = os.path.realpath(
 
 TMP_SUFFIX = ".v2mtmp"
 DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
+
+# ---- 登录鉴权 ----
+PASSWORD = os.environ.get("V2M_PASSWORD", "")
+SESSION_FILE = os.path.join(CONFIG_DIR, "sessions.json")
+COOKIE_NAME = "v2m_session"
+REMEMBER_SECONDS = 30 * 86400
+SESSION_SECONDS = 12 * 3600
+LOGIN_MAX_FAILS = 5
+LOGIN_WINDOW = 600
+
+_sessions = {}
+_sessions_lock = threading.Lock()
+_login_state = {}
+_login_lock = threading.Lock()
+
+
+def load_sessions():
+    try:
+        with open(SESSION_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        now = time.time()
+        return {k: v for k, v in data.items() if isinstance(v, dict) and v.get("exp", 0) > now}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_sessions():
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        tmp = SESSION_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_sessions, f)
+        os.replace(tmp, SESSION_FILE)
+    except OSError:
+        pass
 
 OUTPUT_EXT = ".mp4"
 DEFAULT_EXTS = ["flv", "ts", "mkv", "avi", "mov", "wmv", "f4v", "webm", "mpg", "mpeg", "m4v", "3gp"]
@@ -573,7 +610,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     # ---- 基础输出 ----
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+    def _send(self, code, body, ctype="application/json; charset=utf-8", headers=None):
         if isinstance(body, (dict, list)):
             body = json.dumps(body, ensure_ascii=False).encode("utf-8")
         elif isinstance(body, str):
@@ -582,11 +619,89 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
-    def _json(self, data, code=200):
-        self._send(code, data)
+    def _json(self, data, code=200, headers=None):
+        self._send(code, data, headers=headers)
+
+    def _redirect(self, location, headers=None):
+        h = {"Location": location}
+        h.update(headers or {})
+        self._send(302, b"", "text/plain; charset=utf-8", h)
+
+    # ---- 鉴权 ----
+    def _cookies(self):
+        out = {}
+        raw = self.headers.get("Cookie") or ""
+        for part in raw.split(";"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    def _authed(self):
+        if not PASSWORD:
+            return True
+        token = self._cookies().get(COOKIE_NAME)
+        if not token:
+            return False
+        with _sessions_lock:
+            sess = _sessions.get(token)
+            if not sess:
+                return False
+            if sess.get("exp", 0) <= time.time():
+                _sessions.pop(token, None)
+                save_sessions()
+                return False
+        return True
+
+    def _require_auth(self, path):
+        """返回 True 表示已放行，False 表示已经输出响应。"""
+        if not PASSWORD or self._authed():
+            return True
+        if path.startswith("/api/"):
+            self._json({"error": "未登录", "auth_required": True}, 401)
+        else:
+            self._redirect("/login")
+        return False
+
+    def _login_allowed(self, ip):
+        now = time.time()
+        with _login_lock:
+            arr = [t for t in _login_state.get(ip, []) if now - t < LOGIN_WINDOW]
+            _login_state[ip] = arr
+            return len(arr) < LOGIN_MAX_FAILS
+
+    def _login_fail(self, ip):
+        with _login_lock:
+            _login_state.setdefault(ip, []).append(time.time())
+
+    def _login(self, body):
+        if not PASSWORD:
+            return self._json({"ok": True, "required": False})
+        ip = self.client_address[0]
+        if not self._login_allowed(ip):
+            return self._json({"error": "尝试次数过多，请 10 分钟后再试"}, 429)
+        pwd = str(body.get("password") or "")
+        if not hmac.compare_digest(pwd.encode("utf-8"), PASSWORD.encode("utf-8")):
+            self._login_fail(ip)
+            time.sleep(0.3)
+            return self._json({"error": "密码错误"}, 401)
+        remember = bool(body.get("remember"))
+        ttl = REMEMBER_SECONDS if remember else SESSION_SECONDS
+        token = secrets.token_urlsafe(32)
+        with _sessions_lock:
+            _sessions[token] = {"exp": time.time() + ttl}
+        save_sessions()
+        with _login_lock:
+            _login_state.pop(ip, None)
+        cookie = f"{COOKIE_NAME}={token}; Path=/; HttpOnly; SameSite=Lax"
+        if remember:
+            cookie += f"; Max-Age={REMEMBER_SECONDS}"
+        return self._json({"ok": True}, headers={"Set-Cookie": cookie})
 
     def _body(self):
         try:
@@ -618,9 +733,19 @@ class Handler(BaseHTTPRequestHandler):
         qs = parse_qs(parsed.query)
 
         if path in ("/", "/index.html"):
+            if not self._require_auth(path):
+                return
             return self._static("index.html")
         if path.startswith("/static/"):
             return self._static(path[len("/static/"):])
+        if path == "/login":
+            if self._authed() and PASSWORD:
+                return self._redirect("/")
+            return self._static("login.html")
+        if path == "/api/auth":
+            return self._json({"required": bool(PASSWORD), "authed": self._authed()})
+        if not self._require_auth(path):
+            return
         if path == "/api/settings":
             return self._json(self._decorate(load_settings()))
         if path == "/api/browse":
@@ -633,6 +758,21 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         body = self._body()
+
+        if path == "/api/login":
+            return self._login(body)
+        if path == "/api/logout":
+            token = self._cookies().get(COOKIE_NAME)
+            if token:
+                with _sessions_lock:
+                    _sessions.pop(token, None)
+                save_sessions()
+            return self._json(
+                {"ok": True},
+                headers={"Set-Cookie": f"{COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"},
+            )
+        if not self._require_auth(path):
+            return
 
         if path == "/api/settings":
             return self._save_settings(body)
@@ -736,7 +876,10 @@ class Handler(BaseHTTPRequestHandler):
         if out:
             p = safe_path(out)
             if not p:
-                return self._json({"error": f"输出路径不在允许范围内: {out}"}, 400)
+                return self._json({
+                    "error": f"输出路径不在允许范围内: {out}。"
+                             f"容器只能访问已挂载的目录，路径必须位于 V2M_ROOTS 内（当前: {', '.join(ROOTS)}）"
+                }, 400)
             out = p
 
         s["input_path"] = inp
@@ -805,9 +948,11 @@ class Server(ThreadingHTTPServer):
 
 
 def main():
+    _sessions.update(load_sessions())
     print(f"视频转 MP4 Web 启动: http://0.0.0.0:{PORT}")
     print(f"允许访问的根目录: {ROOTS}")
     print(f"默认输入目录: {DEFAULT_INPUT}")
+    print("登录鉴权: " + ("已开启" if PASSWORD else "未开启（设置 V2M_PASSWORD 可开启）"))
     print(f"默认识别格式: {','.join(DEFAULT_EXTS)}")
     Server(("0.0.0.0", PORT), Handler).serve_forever()
 

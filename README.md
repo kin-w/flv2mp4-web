@@ -28,6 +28,7 @@
 | 能力 | 说明 |
 |---|---|
 | 批量转换 | 目录递归扫描，一次勾选多个文件排队转换 |
+| 登录鉴权 | 设置密码后必须登录才能访问，支持「记住登录」30 天，错误尝试次数过多会临时锁定 |
 | 无损转封装 | 默认 `-c copy`，不重新编码，速度取决于磁盘 IO |
 | 输入目录 / 文件 | 支持指定目录，也支持直接处理单个文件 |
 | 输出目录 | 留空则输出到源文件所在目录；设置后统一输出到指定目录 |
@@ -47,6 +48,7 @@
 docker run -d --name flv2mp4-web --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
+  -e V2M_PASSWORD=你的访问密码 \
   -e V2M_ROOTS=/data \
   -e V2M_DEFAULT_INPUT=/data \
   -v /home/bililive-go:/data \
@@ -68,6 +70,7 @@ services:
       - "8080:8080"
     environment:
       TZ: Asia/Shanghai
+      V2M_PASSWORD: 你的访问密码
       V2M_ROOTS: /data
       V2M_DEFAULT_INPUT: /data
     volumes:
@@ -96,6 +99,7 @@ environment:
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `TZ` | `UTC` | 时区，影响日志时间 |
+| `V2M_PASSWORD` | 空 | 访问密码；设置后必须登录，留空则无需登录（不推荐公网部署） |
 | `V2M_PORT` | `8080` | 监听端口 |
 | `V2M_ROOTS` | `/data` | 允许浏览和转换的根目录，多个用 `:` 分隔 |
 | `V2M_DEFAULT_INPUT` | `V2M_ROOTS` 第一个 | 首屏默认输入目录 |
@@ -115,6 +119,19 @@ environment:
 7. **转换任务**：显示进度、速度、耗时，可取消、可查看日志
 
 所有设置实时保存到 `V2M_CONFIG/settings.json`，重启容器不会丢；`恢复默认` 按钮会连同格式列表和命令一起重置。
+
+## 登录与安全
+
+设置 `V2M_PASSWORD` 后，访问任何页面都会先跳到登录页：
+
+- 勾选「记住登录状态」后登录有效期为 **30 天**；不勾选则 **12 小时**
+- 会话保存在 `/config/sessions.json`，容器重启后「记住登录」仍然有效
+- 同一 IP 连续输错 **5 次**密码会锁定 **10 分钟**（返回 429）
+- 密码只存在环境变量里，不在界面中存储或展示；忘记密码改环境变量重启即可
+- 图文资源（CSS/JS/logo）和登录接口不校验登录，其余所有接口与页面都需要会话
+- 退出按钮在主界面右上角，退出后服务端立即销毁会话（不只是删 cookie）
+
+> 密码通过环境变量明文传入容器，能用 `docker inspect` 看到。对安全要求更高时，建议再套一层反向代理（Nginx + Basic Auth / HTTPS），或只在内网使用。
 
 ## 关于「无损」
 
@@ -152,6 +169,20 @@ ffmpeg -hide_banner -nostdin -y -i {input} -c:v libx264 -crf 23 -c:a aac -b:a 16
 
 **界面显示的是 `/data/xxx`，和宿主机路径不一样？**
 界面里一切路径都是容器内视角，宿主机 `/home/bililive-go` 对应容器里的 `/data`。
+
+**提示「输出路径不在允许范围内」？**
+容器只能看到被 `-v` 挂载进来的目录。想输出到宿主机 `/home/录播归档`，要么把它挂进容器：
+
+```yaml
+volumes:
+  - /home/bililive-go:/data
+  - /home/录播归档:/archive
+environment:
+  V2M_ROOTS: "/data:/archive"
+```
+
+然后在界面里填容器路径 `/archive`，而不是宿主机路径。
+如果确实需要访问宿主机所有目录，可以 `-v /:/host` 并把 `/host` 加入 `V2M_ROOTS`，但这等于把整个文件系统（含删除权限）暴露给 Web 界面，请务必配合密码和防火墙使用。
 
 **转换后文件权限是 root？**
 容器默认以 root 运行，产物属主为 root。如需调整，可在 compose 里加 `user: "1000:1000"`（需保证该用户对挂载目录有读写权限）。
