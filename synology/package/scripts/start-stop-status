@@ -1,0 +1,53 @@
+#!/bin/sh
+# 启动 / 停止 / 状态：用现有镜像创建容器
+PKG_NAME="flv2mp4-web"
+IMAGE="ikimi/flv2mp4-web:latest"
+CONTAINER="flv2mp4-web"
+PORT="8080"
+VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
+CFG="$VAR/config"
+PWFILE="$CFG/password.txt"
+LOG="$VAR/run.log"
+
+DOCKER="$(command -v docker 2>/dev/null)"
+[ -z "$DOCKER" ] && DOCKER="/usr/local/bin/docker"
+
+mkdir -p "$CFG"
+[ -f "$PWFILE" ] || {
+    head -c 9 /dev/urandom | base64 | tr -d '/+=' > "$PWFILE"
+    chmod 600 "$PWFILE"
+}
+PASSWORD="$(cat "$PWFILE" 2>/dev/null)"
+
+running() {
+    "$DOCKER" inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true
+}
+
+case "$1" in
+  start)
+    running && exit 0
+    "$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1
+    "$DOCKER" pull "$IMAGE" >>"$LOG" 2>&1
+    "$DOCKER" run -d --name "$CONTAINER" --restart unless-stopped \
+        -p "$PORT:8080" \
+        -e TZ=Asia/Shanghai \
+        -e V2M_PASSWORD="$PASSWORD" \
+        -e V2M_ROOTS=/host \
+        -e V2M_DEFAULT_INPUT=/host \
+        -v /:/host \
+        -v "$CFG:/config" \
+        "$IMAGE" >>"$LOG" 2>&1
+    sleep 3
+    running && exit 0
+    exit 1
+    ;;
+  stop)
+    "$DOCKER" stop "$CONTAINER" >/dev/null 2>&1
+    exit 0
+    ;;
+  status)
+    running && exit 0
+    exit 1
+    ;;
+esac
+exit 0

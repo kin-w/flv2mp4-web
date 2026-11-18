@@ -1,0 +1,11 @@
+#!/bin/sh
+# 安装后：准备持久化目录与访问密码
+PKG_NAME="flv2mp4-web"
+VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
+CFG="$VAR/config"
+mkdir -p "$CFG"
+if [ ! -f "$CFG/password.txt" ]; then
+    head -c 9 /dev/urandom | base64 | tr -d '/+=' > "$CFG/password.txt"
+    chmod 600 "$CFG/password.txt"
+fi
+exit 0
