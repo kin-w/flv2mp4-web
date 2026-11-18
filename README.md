@@ -42,21 +42,38 @@
 
 ## 快速开始
 
-### docker run
+### docker run（整机挂载，填宿主机路径即可用）
 
 ```bash
 docker run -d --name flv2mp4-web --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
   -e V2M_PASSWORD=你的访问密码 \
-  -e V2M_ROOTS=/data \
-  -e V2M_DEFAULT_INPUT=/data \
-  -v /home/bililive-go:/data \
+  -v /:/host \
   -v ./config:/config \
   ikimi/flv2mp4-web:latest
 ```
 
-启动后访问 `http://服务器IP:8080`。
+启动后访问 `http://服务器IP:8080`，界面里直接在 `/host` 下选目录，例如 `/host/home/录播归档`——就是宿主机路径加 `/host` 前缀。
+
+> 这种方式把整台机器交给了 Web 界面（含删除权限），**必须设置 `V2M_PASSWORD`**，并建议只在内网或限制来源 IP。
+> 未设置 `V2M_ROOTS` 时会自动探测：存在 `/host` 用 `/host`，否则用 `/data`，都没有则用容器根目录。
+
+### docker run（只挂载指定目录）
+
+```bash
+docker run -d --name flv2mp4-web --restart unless-stopped \
+  -p 8080:8080 \
+  -e TZ=Asia/Shanghai \
+  -e V2M_PASSWORD=你的访问密码 \
+  -e V2M_ROOTS=/home \
+  -e V2M_DEFAULT_INPUT=/home \
+  -v /home:/home \
+  -v ./config:/config \
+  ikimi/flv2mp4-web:latest
+```
+
+容器内外路径完全一致，界面里填 `/home/录播归档` 即可，和宿主机一样。
 
 ### docker compose
 
@@ -71,11 +88,9 @@ services:
     environment:
       TZ: Asia/Shanghai
       V2M_PASSWORD: 你的访问密码
-      V2M_ROOTS: /data
-      V2M_DEFAULT_INPUT: /data
     volumes:
-      - /home/bililive-go:/data      # 视频所在目录
-      - ./config:/config             # 设置与界面配置持久化
+      - /:/host                      # 整机挂载：界面路径 = /host + 宿主机路径
+      - ./config:/config             # 设置与会话持久化
 ```
 
 ```bash
@@ -101,7 +116,7 @@ environment:
 | `TZ` | `UTC` | 时区，影响日志时间 |
 | `V2M_PASSWORD` | 空 | 访问密码；设置后必须登录，留空则无需登录（不推荐公网部署） |
 | `V2M_PORT` | `8080` | 监听端口 |
-| `V2M_ROOTS` | `/data` | 允许浏览和转换的根目录，多个用 `:` 分隔 |
+| `V2M_ROOTS` | 自动探测 | 未设置时依次尝试 `/host`、`/data`、容器根目录；多个用 `:` 分隔 |
 | `V2M_DEFAULT_INPUT` | `V2M_ROOTS` 第一个 | 首屏默认输入目录 |
 | `V2M_CONFIG` | `/config` | 配置文件目录，挂载后设置可持久化 |
 | `V2M_FFMPEG` | 自动查找 | ffmpeg 路径，内置镜像已包含 |
@@ -167,22 +182,16 @@ ffmpeg -hide_banner -nostdin -y -i {input} -c:v libx264 -crf 23 -c:a aac -b:a 16
 **为什么任务显示「跳过」？**
 目标位置已经存在同名 mp4，程序不会覆盖，避免误删已完成的文件。
 
-**界面显示的是 `/data/xxx`，和宿主机路径不一样？**
-界面里一切路径都是容器内视角，宿主机 `/home/bililive-go` 对应容器里的 `/data`。
+**界面显示的是 `/host/xxx`，和宿主机路径不一样？**
+界面里一切路径都是容器内视角。整机挂载 `-v /:/host` 时，宿主机 `/home/录播归档` 对应容器里的 `/host/home/录播归档`；按目录原地挂载（如 `-v /home:/home`）时两边路径就完全一致。
 
 **提示「输出路径不在允许范围内」？**
-容器只能看到被 `-v` 挂载进来的目录。想输出到宿主机 `/home/录播归档`，要么把它挂进容器：
+容器只能看到被 `-v` 挂载进来的目录。推荐两种做法：
 
-```yaml
-volumes:
-  - /home/bililive-go:/data
-  - /home/录播归档:/archive
-environment:
-  V2M_ROOTS: "/data:/archive"
-```
+1. 整机挂载：`-v /:/host`，不设置 `V2M_ROOTS`（会自动识别 `/host`），界面里填 `/host/home/录播归档`
+2. 原地挂载：`-v /home:/home -e V2M_ROOTS=/home`，界面里填 `/home/录播归档`
 
-然后在界面里填容器路径 `/archive`，而不是宿主机路径。
-如果确实需要访问宿主机所有目录，可以 `-v /:/host` 并把 `/host` 加入 `V2M_ROOTS`，但这等于把整个文件系统（含删除权限）暴露给 Web 界面，请务必配合密码和防火墙使用。
+错误提示里会列出当前允许的根目录，照着填即可。
 
 **转换后文件权限是 root？**
 容器默认以 root 运行，产物属主为 root。如需调整，可在 compose 里加 `user: "1000:1000"`（需保证该用户对挂载目录有读写权限）。
