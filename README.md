@@ -235,20 +235,6 @@ environment:
 ufw allow from 你的IP to any port 8080
 ```
 
-## 群晖 DSM 套件（SPK）
-
-`synology/` 目录是套件源码，用于把本项目做成 `.spk`，安装后在群晖上自动创建容器。
-
-- 要求：DSM 7.0 及以上，套件中心已安装 **Container Manager**
-- 安装包：`synology/dist/flv2mp4-web_1.0.0_x86_64.spk`（重新打包：`python synology/build.py`）
-- 安装：套件中心 → 右上角「手动安装」→ 选择 `.spk` → 未验证发布者提示时确认继续
-- 访问：`http://群晖IP:8080`
-- 访问密码：SSH 登录后执行 `sudo cat /var/packages/flv2mp4-web/var/config/password.txt`（首次安装随机生成）
-- 数据目录：`/var/packages/flv2mp4-web/var/config`，挂载为容器的 `/config`，套件升级不会丢
-- 卸载时会停止并删除容器，配置目录保留
-
-套件内部行为与 Docker 部署一致：挂载 `/` 到 `/host`，允许访问全盘，因此务必使用生成的密码，并建议只在内网访问。
-
 ## 技术栈
 
 - 后端：Python 3 标准库（`http.server` + 线程队列），无第三方依赖

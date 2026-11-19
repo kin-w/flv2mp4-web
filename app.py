@@ -266,16 +266,19 @@ def resolve_output(src, settings):
     if not root:
         out_dir = base_dir
     else:
-        inp = settings["input_path"]
+        inp = os.path.realpath(settings["input_path"]) if settings["input_path"] else ""
         out_dir = root
-        if os.path.isdir(inp) and os.path.realpath(inp) != os.path.realpath(root):
-            rel = os.path.relpath(src, inp)
+        if inp and os.path.isdir(inp) and inp != os.path.realpath(root):
+            rel = os.path.relpath(os.path.realpath(src), inp)
             if rel.startswith(".."):
                 out_dir = os.path.join(root, os.path.basename(base_dir))
             else:
                 sub = os.path.dirname(rel)
-                name = os.path.basename(os.path.normpath(inp)) or "root"
-                out_dir = os.path.join(root, name, sub) if sub else os.path.join(root, name)
+                if inp in ROOTS:
+                    out_dir = os.path.join(root, sub) if sub else root
+                else:
+                    name = os.path.basename(inp) or "root"
+                    out_dir = os.path.join(root, name, sub) if sub else os.path.join(root, name)
     stem = os.path.splitext(os.path.basename(src))[0]
     return out_dir, os.path.join(out_dir, stem + OUTPUT_EXT)
 
@@ -977,6 +980,7 @@ class Handler(BaseHTTPRequestHandler):
                 "rel": os.path.relpath(f, target if os.path.isdir(target) else os.path.dirname(target)),
                 "size": _size_of(f),
                 "mtime": os.path.getmtime(f),
+                "out_dir": out_dir,
                 "exists": os.path.exists(out) and os.path.getsize(out) > 0,
                 "active": f in active,
             })

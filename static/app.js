@@ -165,10 +165,29 @@ async function scan(silent = false) {
   }
 }
 
+function folderOf(rel) {
+  const i = Math.max(rel.lastIndexOf("/"), rel.lastIndexOf("\\"));
+  return i >= 0 ? rel.slice(0, i) : "";
+}
+
+function extOf(name) {
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(i + 1).toLowerCase() : "其他";
+}
+
 function renderFiles() {
   const list = $("fileList");
   const files = state.files;
-  $("fileCount").textContent = files.length ? `${files.length} 个视频文件` : "没有找到匹配的视频文件";
+  const groups = new Map();
+  files.forEach((f, i) => {
+    const dir = folderOf(f.rel);
+    if (!groups.has(dir)) groups.set(dir, []);
+    groups.get(dir).push(i);
+  });
+
+  $("fileCount").textContent = files.length
+    ? `${files.length} 个视频 · ${groups.size} 个文件夹`
+    : "没有找到匹配的视频文件";
 
   if (!files.length) {
     list.innerHTML = `<div class="empty">当前路径下没有待转换的视频文件</div>`;
@@ -176,25 +195,60 @@ function renderFiles() {
     return;
   }
 
-  list.innerHTML = files.map((f, i) => {
-    const disabled = f.exists || f.active;
-    const chip = f.active
-      ? `<span class="chip run">转换中</span>`
-      : f.exists
-        ? `<span class="chip ok">已存在 mp4</span>`
-        : `<span class="chip warn">待转换</span>`;
+  list.innerHTML = [...groups].map(([dir, idxs], gi) => {
+    const gfiles = idxs.map(i => files[i]);
+    const total = gfiles.reduce((a, f) => a + f.size, 0);
+    const ready = gfiles.filter(f => !f.exists && !f.active).length;
+    const byExt = new Map();
+    gfiles.forEach(f => {
+      const e = extOf(f.name);
+      const o = byExt.get(e) || { n: 0, s: 0 };
+      o.n += 1;
+      o.s += f.size;
+      byExt.set(e, o);
+    });
+    const extChips = [...byExt]
+      .sort((a, b) => b[1].s - a[1].s)
+      .map(([e, o]) => `<span class="ext-chip">${esc(e)} ${o.n} 个 · ${fmtSize(o.s)}</span>`)
+      .join("");
+    const outDir = gfiles[0].out_dir || "";
+
+    const rows = idxs.map(i => {
+      const f = files[i];
+      const disabled = f.exists || f.active;
+      const chip = f.active
+        ? `<span class="chip run">转换中</span>`
+        : f.exists
+          ? `<span class="chip ok">已存在 mp4</span>`
+          : `<span class="chip warn">待转换</span>`;
+      return `
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" data-idx="${i}" ${disabled ? "disabled" : ""}>
+          </label>
+          <div class="meta">
+            <div class="name" title="${esc(f.rel)}">${esc(f.name)}</div>
+            <div class="sub">${fmtSize(f.size)}</div>
+          </div>
+          ${chip}
+          <button class="btn sm" data-convert="${i}" ${disabled ? "disabled" : ""}>转换</button>
+        </div>`;
+    }).join("");
+
     return `
-      <div class="row">
-        <label class="check">
-          <input type="checkbox" data-idx="${i}" ${disabled ? "disabled" : ""}>
-        </label>
-        <div class="meta">
-          <div class="name" title="${esc(f.rel)}">${esc(f.rel)}</div>
-          <div class="sub">${fmtSize(f.size)}</div>
+      <section class="folder" data-g="${gi}">
+        <div class="fhead">
+          <label class="check"><input type="checkbox" data-folder="${gi}"></label>
+          <div class="fmeta">
+            <div class="fname" title="${esc(dir || "根目录")}">${esc(dir || "根目录")}</div>
+            <div class="fstat">${gfiles.length} 个文件 · ${fmtSize(total)} · 可转换 ${ready} 个</div>
+            <div class="fext">${extChips}</div>
+            <div class="fout" title="${esc(outDir)}">输出 → ${esc(outDir)}</div>
+          </div>
+          <button class="btn ghost sm" data-toggle="${gi}">展开</button>
         </div>
-        ${chip}
-        <button class="btn sm" data-convert="${i}" ${disabled ? "disabled" : ""}>转换</button>
-      </div>`;
+        <div class="fbody" hidden>${rows}</div>
+      </section>`;
   }).join("");
 
   list.querySelectorAll("input[data-idx]").forEach(cb => {
@@ -202,6 +256,21 @@ function renderFiles() {
   });
   list.querySelectorAll("button[data-convert]").forEach(btn => {
     btn.addEventListener("click", () => convertFiles([state.files[+btn.dataset.convert].path]));
+  });
+  list.querySelectorAll("button[data-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const body = btn.closest(".folder").querySelector(".fbody");
+      body.hidden = !body.hidden;
+      btn.textContent = body.hidden ? "展开" : "收起";
+    });
+  });
+  list.querySelectorAll("input[data-folder]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      cb.closest(".folder").querySelectorAll("input[data-idx]:not(:disabled)").forEach(item => {
+        item.checked = cb.checked;
+      });
+      updateSelection();
+    });
   });
   updateSelection();
 }
@@ -221,6 +290,14 @@ function updateSelection() {
   $("btnConvertSelected").disabled = checked === 0;
   $("btnConvertSelected").textContent = checked ? `转换所选 (${checked})` : "转换所选";
   $("checkAll").checked = enabled.length > 0 && checked === enabled.length;
+
+  document.querySelectorAll("#fileList input[data-folder]").forEach(fb => {
+    const items = [...fb.closest(".folder").querySelectorAll("input[data-idx]:not(:disabled)")];
+    const on = items.filter(cb => cb.checked).length;
+    fb.checked = items.length > 0 && on === items.length;
+    fb.indeterminate = on > 0 && on < items.length;
+    fb.disabled = items.length === 0;
+  });
 }
 
 async function convertFiles(paths) {

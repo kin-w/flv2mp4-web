@@ -1,8 +1,0 @@
-#!/bin/sh
-# 卸载前：停止并删除容器（配置目录保留）
-CONTAINER="flv2mp4-web"
-DOCKER="$(command -v docker 2>/dev/null)"
-[ -z "$DOCKER" ] && DOCKER="/usr/local/bin/docker"
-"$DOCKER" stop "$CONTAINER" >/dev/null 2>&1
-"$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1
-exit 0
