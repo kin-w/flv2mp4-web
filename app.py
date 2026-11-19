@@ -986,6 +986,8 @@ class Handler(BaseHTTPRequestHandler):
             })
         return self._json({
             "is_file": os.path.isfile(target),
+            "root": target,
+            "root_name": os.path.basename(os.path.normpath(target)) if os.path.isdir(target) else os.path.basename(os.path.dirname(target)),
             "files": result,
             "out_dir": settings["output_path"] or (
                 os.path.dirname(target) if os.path.isfile(target) else target

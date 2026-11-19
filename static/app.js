@@ -8,6 +8,9 @@ const state = {
   browsePath: "",
   lastJobStates: {},
   jobsSig: "",
+  scanRoot: "",
+  rootName: "",
+  showAllJobs: false,
 };
 
 /* ---------------- 基础 ---------------- */
@@ -152,8 +155,15 @@ async function scan(silent = false) {
   if (!silent) setStatus("扫描中…", "busy");
   try {
     const data = await post("/api/scan", { path, recursive: $("recursive").checked });
+    if (state.scanRoot !== data.root) {
+      state.scanRoot = data.root;
+      state.rootName = data.root_name || "";
+      state.showAllJobs = false;
+      state.jobsSig = "";
+    }
     state.files = data.files;
     renderFiles();
+    renderJobs();
     if (!silent) {
       setStatus(`共 ${data.files.length} 个文件`, "");
     }
@@ -212,6 +222,7 @@ function renderFiles() {
       .map(([e, o]) => `<span class="ext-chip">${esc(e)} ${o.n} 个 · ${fmtSize(o.s)}</span>`)
       .join("");
     const outDir = gfiles[0].out_dir || "";
+    const dirLabel = dir || state.rootName || "根目录";
 
     const rows = idxs.map(i => {
       const f = files[i];
@@ -240,7 +251,7 @@ function renderFiles() {
         <div class="fhead">
           <label class="check"><input type="checkbox" data-folder="${gi}"></label>
           <div class="fmeta">
-            <div class="fname" title="${esc(dir || "根目录")}">${esc(dir || "根目录")}</div>
+            <div class="fname" title="${esc(dir || state.rootName || "根目录")}">${esc(dirLabel)}</div>
             <div class="fstat">${gfiles.length} 个文件 · ${fmtSize(total)} · 可转换 ${ready} 个</div>
             <div class="fext">${extChips}</div>
             <div class="fout" title="${esc(outDir)}">输出 → ${esc(outDir)}</div>
@@ -341,23 +352,35 @@ function setStatusFromJobs() {
   }
 }
 
+function jobInScope(j) {
+  if (state.showAllJobs || !state.scanRoot) return true;
+  const root = state.scanRoot.replace(/[\\/]+$/, "");
+  const src = j.src || "";
+  return src === root || src.startsWith(root + "/") || src.startsWith(root + "\\");
+}
+
 function renderJobs() {
   const list = $("jobList");
-  if (!state.jobs.length) {
-    if (state.jobsSig !== "[]") {
-      state.jobsSig = "[]";
-      list.innerHTML = `<div class="empty">暂无任务</div>`;
+  const visible = state.jobs.filter(jobInScope);
+  const scopeBtn = $("btnJobScope");
+  if (scopeBtn) scopeBtn.textContent = state.showAllJobs ? "只看当前目录" : "显示全部";
+
+  if (!visible.length) {
+    const text = state.jobs.length ? "当前目录暂无任务" : "暂无任务";
+    if (state.jobsSig !== text) {
+      state.jobsSig = text;
+      list.innerHTML = `<div class="empty">${text}</div>`;
     }
     return;
   }
 
   // 轮询结果没变化就不重绘，避免进度条闪烁
-  const sig = JSON.stringify(state.jobs);
+  const sig = JSON.stringify([state.showAllJobs, state.scanRoot, visible]);
   if (sig === state.jobsSig) return;
   state.jobsSig = sig;
 
   // 从后往前展示最新任务（最多 60 条）
-  const jobs = [...state.jobs].reverse().slice(0, 60);
+  const jobs = [...visible].reverse().slice(0, 60);
   list.innerHTML = jobs.map(j => {
     const cls = j.state === "done" || j.state === "skipped" ? "done"
       : j.state === "failed" ? "failed" : "";
@@ -641,6 +664,11 @@ function bind() {
   });
 
   $("btnConvertSelected").addEventListener("click", () => convertFiles(selectedFiles()));
+  $("btnJobScope").addEventListener("click", () => {
+    state.showAllJobs = !state.showAllJobs;
+    state.jobsSig = "";
+    renderJobs();
+  });
   $("btnClearJobs").addEventListener("click", async () => {
     await post("/api/jobs/clear", {});
     loadJobs();
@@ -705,8 +733,8 @@ function applyTheme(theme, persist) {
   } catch (_) {}
   try {
     await loadSettings();
-    await loadJobs();
     await scan(true);
+    await loadJobs();
   } catch (e) {
     toast(e.message, true);
   }

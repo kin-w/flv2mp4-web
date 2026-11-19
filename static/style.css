@@ -181,6 +181,12 @@ body {
   margin-bottom: 16px;
 }
 
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .card-head h2 {
   margin: 0;
   font-size: 13px;
