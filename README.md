@@ -42,6 +42,47 @@
 
 ## 快速开始
 
+### 一键部署（推荐）
+
+在服务器上以 root 执行，脚本会自动安装 Docker、拉取镜像、生成 compose 并启动：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/kin-w/flv2mp4-web/main/install.sh) -p 你的访问密码
+```
+
+也可以用 wget：
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/kin-w/flv2mp4-web/main/install.sh) -p 你的访问密码
+```
+
+默认全盘模式（宿主机 `/` 挂载到容器 `/host`），执行完会直接打印访问地址和密码。
+
+常用组合：
+
+```bash
+# 只开放录播目录，端口改成 9000
+bash install.sh -p mypass -P 9000 -d /home/bililive-go
+
+# 使用镜像加速 + 自定义配置目录
+bash install.sh -p mypass -m docker.1panel.live -c /root/flv2mp4/config
+```
+
+| 参数 | 说明 | 默认值 |
+|---|---|---|
+| `-p` | 访问密码 | 不填则随机生成并打印 |
+| `-P` | Web 端口 | `8080` |
+| `-d` | 挂载的宿主机目录 | `/`（全盘模式） |
+| `-c` | 配置存放目录 | `/opt/flv2mp4-web/config` |
+| `-n` | 容器名称 | `flv2mp4-web` |
+| `-u` | Docker Hub 用户名 | `ikimi` |
+| `-T` | 镜像标签 | `latest` |
+| `-m` | 镜像加速前缀 | 空 |
+| `-t` | 时区 | `Asia/Shanghai` |
+| `-h` | 显示帮助 | — |
+
+脚本可重复执行：检测到同名容器会先删除再重建，配置目录 `/config` 保留，设置和登录状态不会丢。
+
 ### docker run（默认全盘模式）
 
 把宿主机根目录挂进容器，界面里可以访问任意目录：
