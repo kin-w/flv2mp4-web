@@ -127,6 +127,16 @@ services:
 docker compose up -d
 ```
 
+### 更新 / 升级
+
+镜像使用 `latest` 标签，发布新版本后拉取并重建容器即可，`config` 目录会保留，设置与登录状态不丢：
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+用 `docker run` 部署的话，先 `docker rm -f flv2mp4-web` 再重新执行原来的 `docker run` 命令；也可以在服务端直接重跑一次 `install.sh`。
+
 ### 路径对应
 
 容器里的 `/` 是镜像自己的文件系统，不能被宿主机覆盖，所以宿主机根目录挂在 `/host`：
