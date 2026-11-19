@@ -11,7 +11,7 @@ IMAGE_USER="ikimi"
 IMAGE_NAME="flv2mp4-web"
 IMAGE_TAG="latest"
 MIRROR=""
-PORT="8080"
+PORT="5454"
 PASSWORD=""
 CONTAINER="flv2mp4-web"
 CONF_DIR="/opt/flv2mp4-web/config"
@@ -34,7 +34,7 @@ usage() {
 
 选项：
   -p <密码>    访问密码（不填则自动生成随机密码）
-  -P <端口>    Web 端口，默认 8080
+  -P <端口>    Web 端口，默认 5454
   -d <目录>    挂载的宿主机目录，默认 /（全盘模式）
                 例：-d /home/bililive-go 只暴露这个目录
   -c <目录>    配置存放目录，默认 /opt/flv2mp4-web/config
@@ -155,7 +155,7 @@ services:
     container_name: ${CONTAINER}
     restart: unless-stopped
     ports:
-      - "${PORT}:8080"
+      - "${PORT}:5454"
     environment:
       TZ: ${TZ_VALUE}
       V2M_PASSWORD: "${PASSWORD}"

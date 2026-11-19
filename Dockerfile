@@ -22,9 +22,9 @@ RUN mkdir -p /config
 ENV V2M_CONFIG=/config \
     V2M_ROOTS=/data \
     V2M_DEFAULT_INPUT=/data \
-    V2M_PORT=8080
+    V2M_PORT=5454
 
 VOLUME ["/config"]
-EXPOSE 8080
+EXPOSE 5454
 
 CMD ["python3", "-u", "/app/app.py"]

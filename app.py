@@ -25,7 +25,7 @@ STATIC_DIR = os.path.join(APP_DIR, "static")
 
 CONFIG_DIR = os.environ.get("V2M_CONFIG", "/config")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
-PORT = int(os.environ.get("V2M_PORT", "8080"))
+PORT = int(os.environ.get("V2M_PORT", "5454"))
 
 FFMPEG = os.environ.get("V2M_FFMPEG") or shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
 FFPROBE = os.environ.get("V2M_FFPROBE") or shutil.which("ffprobe") or "/usr/bin/ffprobe"

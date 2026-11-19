@@ -5,7 +5,7 @@ services:
     container_name: flv2mp4-web
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "5454:5454"
     environment:
       TZ: Asia/Shanghai
       # 访问密码，留空则不启用登录

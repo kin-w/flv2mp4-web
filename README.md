@@ -71,7 +71,7 @@ bash install.sh -p mypass -m docker.1panel.live -c /root/flv2mp4/config
 | 参数 | 说明 | 默认值 |
 |---|---|---|
 | `-p` | 访问密码 | 不填则随机生成并打印 |
-| `-P` | Web 端口 | `8080` |
+| `-P` | Web 端口 | `5454` |
 | `-d` | 挂载的宿主机目录 | `/`（全盘模式） |
 | `-c` | 配置存放目录 | `/opt/flv2mp4-web/config` |
 | `-n` | 容器名称 | `flv2mp4-web` |
@@ -89,7 +89,7 @@ bash install.sh -p mypass -m docker.1panel.live -c /root/flv2mp4/config
 
 ```bash
 docker run -d --name flv2mp4-web --restart unless-stopped \
-  -p 8080:8080 \
+  -p 5454:5454 \
   -e TZ=Asia/Shanghai \
   -e V2M_PASSWORD=你的访问密码 \
   -e V2M_ROOTS=/host \
@@ -99,7 +99,7 @@ docker run -d --name flv2mp4-web --restart unless-stopped \
   ikimi/flv2mp4-web:latest
 ```
 
-启动后访问 `http://服务器IP:8080`。
+启动后访问 `http://服务器IP:5454`。
 
 ### docker compose
 
@@ -112,7 +112,7 @@ services:
     container_name: flv2mp4-web
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "5454:5454"
     environment:
       TZ: Asia/Shanghai
       V2M_PASSWORD: 你的访问密码
@@ -169,7 +169,7 @@ environment:
 |---|---|---|
 | `TZ` | `UTC` | 时区，影响日志时间 |
 | `V2M_PASSWORD` | 空 | 访问密码；设置后必须登录，留空则无需登录（不推荐公网部署） |
-| `V2M_PORT` | `8080` | 监听端口 |
+| `V2M_PORT` | `5454` | 监听端口 |
 | `V2M_ROOTS` | `/data` | 允许浏览和转换的根目录，多个用 `:` 分隔 |
 | `V2M_DEFAULT_INPUT` | `V2M_ROOTS` 第一个 | 首屏默认输入目录 |
 | `V2M_CONFIG` | `/config` | 配置文件目录，挂载后设置可持久化 |
@@ -270,10 +270,10 @@ environment:
 容器默认以 root 运行，产物属主为 root。如需调整，可在 compose 里加 `user: "1000:1000"`（需保证该用户对挂载目录有读写权限）。
 
 **是否安全？**
-镜像内没有登录鉴权，任何能访问端口的人都能浏览、转换、删除 `V2M_ROOTS` 下的视频。请只在内网使用，或用防火墙限制来源 IP：
+设置 `V2M_PASSWORD` 后必须登录才能访问；未设置则任何能访问端口的人都能浏览、转换、删除 `V2M_ROOTS` 下的视频。公网部署请务必设置密码，并用防火墙限制来源 IP：
 
 ```bash
-ufw allow from 你的IP to any port 8080
+ufw allow from 你的IP to any port 5454
 ```
 
 ## 技术栈
