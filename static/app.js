@@ -674,6 +674,28 @@ function bind() {
   });
 }
 
+/* ---------------- 主题 ---------------- */
+function applyTheme(theme, persist) {
+  document.documentElement.dataset.theme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === "light" ? "#f3f5fa" : "#0a0c11";
+  if (persist) {
+    try { localStorage.setItem("v2m-theme", theme); } catch (_) {}
+  }
+  const btn = $("btnTheme");
+  if (btn) btn.title = theme === "light" ? "切换到深色主题" : "切换到明亮主题";
+}
+
+(function bindTheme() {
+  applyTheme(document.documentElement.dataset.theme || "dark", false);
+  const btn = $("btnTheme");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    applyTheme(next, true);
+  });
+})();
+
 /* ---------------- 启动 ---------------- */
 (async function init() {
   bind();
